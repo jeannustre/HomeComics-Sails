@@ -1,1 +1,3 @@
-# HomeComics-Sails
+# HomeComics
+
+a [Sails](http://sailsjs.org) application
