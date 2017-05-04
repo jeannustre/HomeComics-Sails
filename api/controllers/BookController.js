@@ -39,15 +39,23 @@ var Book = {
         return res.badRequest('No file was uploaded')
       }
       var archivePath = files[0].fd
-      var fnLength = archivePath.length
-      var extension = archivePath.substring(fnLength - 4, fnLength)
+      var pathLength = archivePath.length
+      var archiveName = files[0].filename
+      var extension = archivePath.substring(pathLength - 4, pathLength)
+      var name = archiveName.substring(0, archiveName.length - 4)
+      console.log("Unarchiving file <" + name + "> with extension <" + extension + ">")
       if (extension === ".cbz" || extension === ".zip") {
         console.log("Unarchiving zip file...")
         yauzl.open(archivePath, {lazyEntries: true}, handleZipFile)
       } else if (extension === ".cbr" || extension === ".rar") {
         console.log("Unarchiving rar file...")
         var rar = new Unrar(archivePath)
-        rar.extract('./UNARCHIVED/', null, function(err) {
+        // create directory
+        mkdirp('./UNARCHIVED/' + name, function(err) {
+          if (err) throw err
+          console.log("created folder ./UNARCHIVED/" + name + "/")
+        })
+        rar.extract('./UNARCHIVED/' + name + "/", null, function(err) {
           if (err) throw err
           console.log("Unarchived rar file successfully")
         })
