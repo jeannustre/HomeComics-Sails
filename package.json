@@ -22,6 +22,7 @@
     "grunt-sync": "0.5.2",
     "include-all": "^1.0.0",
     "machinepack-zip": "^1.1.0",
+    "path": "^0.12.7",
     "rc": "1.0.1",
     "sails": "~0.12.13",
     "sails-disk": "~0.10.9",
@@ -29,6 +30,7 @@
     "unzip": "^0.1.11",
     "unzip2": "^0.2.5",
     "unzipper": "^0.8.8",
+    "util": "^0.10.3",
     "yauzl": "^2.8.0"
   },
   "scripts": {
