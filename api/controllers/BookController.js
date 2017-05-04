@@ -40,74 +40,42 @@ var Book = {
         return res.badRequest('No file was uploaded')
       }
       var archivePath = files[0].fd
-      var pathLength = archivePath.length
-      var archiveName = files[0].filename
-      var extension = archivePath.substring(pathLength - 4, pathLength)
-      var bookName = archiveName.substring(0, archiveName.length - 4)
+      var extension = archivePath.substring(archivePath.length - 4, archivePath.length)
+      var bookName = files[0].filename.substring(0, files[0].filename.length - 4)
       console.log("Unarchiving book <" + bookName + "> with extension <" + extension + ">")
-
-
       if (!fs.existsSync(dataFolder)){
         console.log("Creating data folder : " + dataFolder)
         fs.mkdirSync(dataFolder)
       }
 
-
-      if (extension === ".cbz" || extension === ".zip") {
+      if (isZip(extension)) {
         console.log("Unarchiving zip file...")
         yauzl.open(archivePath, {lazyEntries: true}, handleZipFile)
-      } else if (extension === ".cbr" || extension === ".rar") {
+      } else if (isRar(extension)) {
         rar = new Unrar(archivePath)
-
         console.log("Unarchiving rar file...")
-        rar.list(function(err, entries){
-          for (var i = 0; i < entries.length; i++) {
-            var name = entries[i].name
-            var type = entries[i].type
-            //console.log("First run, evaluating <" + name + " | " + type + ">")
-            if (type !== 'File') {
-              console.log("(1/2) Creating folder: <" + name + ">")
-              makeDirSync(dataFolder + name)
-            }
-          }
-          for (var i = 0; i < entries.length; i++) {
-            var name = entries[i].name
-            var type = entries[i].type
-            if (type !== 'File') {
-              continue;
-            }
-            console.log("(2/2) Creating file: <" + dataFolder + name + ">")
-            var stream = rar.stream(name)
-            var destName = dataFolder + name
-            try {
-              stream.pipe(fs.createWriteStream(destName))
-              //fs.writeFileSync(name, stream)
-            } catch (e) {
-              throw e
-            }
-          }
-        })
-        /*
-        var rar = new Unrar(archivePath)
-        // create directory
-        mkdirp('./UNARCHIVED/' + name, function(err) {
-          if (err) throw err
-          console.log("created folder ./UNARCHIVED/" + name + "/")
-        })
-        rar.extract('./UNARCHIVED/' + name + "/", null, function(err) {
-          if (err) throw err
-          console.log("Unarchived rar file successfully")
-        })*/
+        rar.list(handleRarFile)
+      } else {
+        console.log("wrong file extension")
       }
       return res.json({
         message: files.length + ' file(s) uploaded successfully!',
         files: files
       })
     })
+
   }
 }
 
 module.exports = Book;
+
+function isRar(extension) {
+  return extension === ".cbr" || extension === ".rar" ? true : false
+}
+
+function isZip(extension) {
+  return extension === ".cbz" || extension === ".zip" ? true : false
+}
 
 function makeDirSync(dir) {
   if (dir === ".") return
@@ -123,16 +91,41 @@ function makeDirSync(dir) {
   }
 }
 
-function mkdirp(dir, cb) {
+function makeDirAsync(dir, cb) {
   if (dir === ".") return cb()
   fs.stat(dir, function(err) {
     if (err == null) return cb() // folder already exists
     var parent = path.dirname(dir)
-    mkdirp(parent, function() {
+    makeDirAsync(parent, function() {
       process.stdout.write(dir.replace(/\/$/, "") + "/\n")
       fs.mkdir(dir, cb)
     })
   })
+}
+
+function handleRarFile(err, entries) {
+  // We run through all entries first to create folders...
+  for (var i = 0; i < entries.length; i++) {
+    var name = entries[i].name
+    var type = entries[i].type
+    if (type !== 'File') {
+      //console.log("(1/2) Creating folder: <" + name + ">")
+      makeDirSync(dataFolder + name)
+    }
+  }
+  // Then we go through a second time to write files
+  for (var i = 0; i < entries.length; i++) {
+    var name = entries[i].name
+    var type = entries[i].type
+    if (type !== 'File') {
+      continue;
+    }
+    try {
+      rar.stream(name).pipe(fs.createWriteStream(dataFolder + name))
+    } catch (e) {
+      throw e
+    }
+  }
 }
 
 function handleZipFile(err, zipfile) {
@@ -158,55 +151,25 @@ function handleZipFile(err, zipfile) {
   zipfile.readEntry()
   zipfile.on("entry", function(entry) {
     if (/\/$/.test(entry.fileName)) {
-      // directory file names end with '/'
       var foldername = dataFolder + entry.fileName
-      console.log("ZIP creating folder : " + foldername)
-      mkdirp(foldername, function() {
+      makeDirAsync(foldername, function() {
         if (err) throw err;
         zipfile.readEntry()
       })
     } else {
-      // ensure parent directory exists
-      mkdirp(path.dirname(entry.fileName), function() {
+      makeDirAsync(path.dirname(entry.fileName), function() {
         zipfile.openReadStream(entry, function(err, readStream) {
           if (err) throw err
           // report progress through large files
-          var byteCount = 0
-          var totalBytes = entry.uncompressedSize
-
           var filename = dataFolder + entry.fileName
-          console.log("ZIP creating file : " + filename)
-          var lastReportedString = byteCount + "/" + totalBytes + " 0%"
-          process.stdout.write(filename + "..." + lastReportedString)
-          function reportString(msg) {
-            var clearString = ""
-            for (var i = 0; i < lastReportedString.length; i++) {
-              clearString += "\b"
-              if (i >= msg.length) {
-                clearString += " \b"
-              }
-            }
-            process.stdout.write(clearString + msg)
-            lastReportedString = msg
-          }
-          // report progress at 60hz
-          var progressInterval = setInterval(function() {
-            reportString(byteCount + "/" + totalBytes + " " + ((byteCount / totalBytes * 100) | 0) + "%")
-          }, 1000/60)
           var filter = new Transform()
           filter._transform = function(chunk, encoding, cb) {
-            byteCount += chunk.length
             cb(null, chunk)
           }
           filter._flush = function(cb) {
-            clearInterval(progressInterval)
-            reportString("")
-            // delete the "..."
-            process.stdout.write("\b \b\b \b\b \b\n")
             cb()
             zipfile.readEntry()
           }
-
           // pump file contents
           var writeStream = fs.createWriteStream(filename)
           incrementHandleCount()
