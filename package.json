@@ -5,7 +5,6 @@
   "description": "a Sails application",
   "keywords": [],
   "dependencies": {
-    "decompress-zip": "^0.3.0",
     "ejs": "2.3.4",
     "fs": "0.0.2",
     "grunt": "1.0.1",
@@ -21,15 +20,11 @@
     "grunt-sails-linker": "~0.10.1",
     "grunt-sync": "0.5.2",
     "include-all": "^1.0.0",
-    "machinepack-zip": "^1.1.0",
     "path": "^0.12.7",
     "rc": "1.0.1",
     "sails": "~0.12.13",
     "sails-disk": "~0.10.9",
     "sails-postgresql": "^0.11.4",
-    "unzip": "^0.1.11",
-    "unzip2": "^0.2.5",
-    "unzipper": "^0.8.8",
     "util": "^0.10.3",
     "yauzl": "^2.8.0"
   },

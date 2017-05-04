@@ -6,17 +6,17 @@
 */
 
 var fs = require('fs')
-var stream = require('stream')
+//var stream = require('stream')
 var yauzl = require('yauzl')
 var path = require('path')
 var util = require('util')
 var Transform = require('stream').Transform
-// see https://github.com/thejoshwolfe/yauzl/blob/master/examples/unzip.js
+// see https://github.com/thejoshwolfe/yauzl/
 
 function mkdirp(dir, cb) {
   if (dir === ".") return cb()
   fs.stat(dir, function(err) {
-    if (err == null) return cb() // folder already exisrs
+    if (err == null) return cb() // folder already exists
     var parent = path.dirname(dir)
     mkdirp(parent, function() {
       process.stdout.write(dir.replace(/\/$/, "") + "/\n")
@@ -46,7 +46,6 @@ function handleZipFile(err, zipfile) {
   })
 
   zipfile.readEntry()
-
   zipfile.on("entry", function(entry) {
     if (/\/$/.test(entry.fileName)) {
       // directory file names end with '/'
@@ -98,16 +97,10 @@ function handleZipFile(err, zipfile) {
           incrementHandleCount()
           writeStream.on("close", decrementHandleCount)
           readStream.pipe(filter).pipe(writeStream)
-
         })
       })
     }
-
-
-
   })
-
-
 }
 
 var Book = {
@@ -134,43 +127,14 @@ var Book = {
       if (files.length === 0) {
         return res.badRequest('No file was uploaded')
       }
-
       var zipPath = files[0].fd
       console.log('unzipping file at ' + path)
       yauzl.open(zipPath, {lazyEntries: true}, handleZipFile)
-    /*  yauzl.open(path, {lazyEntries: true}, function(err, zipfile) {
-        if (err) throw err;
-        zipfile.readEntry();
-        zipfile.on("entry", function(entry) {
-          console.log('entry: ' + JSON.stringify(entry))
-          if (/\/$/.test(entry.fileName)) {
-            console.log('A')
-            zipfile.readEntry()
-            // Directory file names end with '/'.
-            // Note that entires for directories themselves are optional.
-            // An entry's fileName implicitly requires its parent directories to exist.
-          } else {
-            // file entry
-            console.log('B')
-            zipfile.openReadStream(entry, function(err, readStream) {
-              if (err) throw err;
-              readStream.on("end", function() {
-                zipfile.readEntry();
-              });
-              //readStream.pipe(fsomewhere);
-            });
-          }
-        });
-      })*/
-
-
       return res.json({
         message: files.length + ' file(s) uploaded successfully!',
         files: files
       })
-
     })
-
   }
 }
 
