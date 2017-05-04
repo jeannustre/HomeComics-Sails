@@ -13,6 +13,49 @@ var util = require('util')
 var Transform = require('stream').Transform
 // see https://github.com/thejoshwolfe/yauzl/
 
+var Book = {
+
+  index: function(req, res) {
+    res.writeHead(200, {'content-type': 'text/html'});
+    res.end(
+      '<form action="http://localhost:1337/book/upload" enctype="multipart/form-data" method="post">'+
+      '<input type="text" name="title"><br>'+
+      '<input type="file" name="archive" multiple="multiple"><br>'+
+      '<input type="submit" value="Upload">'+
+      '</form>'
+    )
+  },
+
+  upload: function(req, res) {
+    req.file('archive').upload({
+      // 800MB
+      maxBytes: 800000000
+    }, function(err, files) {
+      if (err) {
+        return res.serverError(err)
+      }
+      if (files.length === 0) {
+        return res.badRequest('No file was uploaded')
+      }
+      var zipPath = files[0].fd
+      var fnLength = zipPath.length
+      var extension = zipPath.substring(fnLength - 4, fnLength)
+      if (extension === ".cbz" || extension === ".zip") {
+        console.log("Unarchiving zip file...")
+        yauzl.open(zipPath, {lazyEntries: true}, handleZipFile)
+      } else if (extension === ".cbr" || extension === ".rar") {
+        // handle unrar
+      }
+      return res.json({
+        message: files.length + ' file(s) uploaded successfully!',
+        files: files
+      })
+    })
+  }
+}
+
+module.exports = Book;
+
 function mkdirp(dir, cb) {
   if (dir === ".") return cb()
   fs.stat(dir, function(err) {
@@ -102,40 +145,3 @@ function handleZipFile(err, zipfile) {
     }
   })
 }
-
-var Book = {
-
-  index: function(req, res) {
-    res.writeHead(200, {'content-type': 'text/html'});
-    res.end(
-      '<form action="http://localhost:1337/book/upload" enctype="multipart/form-data" method="post">'+
-      '<input type="text" name="title"><br>'+
-      '<input type="file" name="archive" multiple="multiple"><br>'+
-      '<input type="submit" value="Upload">'+
-      '</form>'
-    )
-  },
-
-  upload: function(req, res) {
-    req.file('archive').upload({
-      // 800MB
-      maxBytes: 800000000
-    }, function(err, files) {
-      if (err) {
-        return res.serverError(err)
-      }
-      if (files.length === 0) {
-        return res.badRequest('No file was uploaded')
-      }
-      var zipPath = files[0].fd
-      console.log('unzipping file at ' + path)
-      yauzl.open(zipPath, {lazyEntries: true}, handleZipFile)
-      return res.json({
-        message: files.length + ' file(s) uploaded successfully!',
-        files: files
-      })
-    })
-  }
-}
-
-module.exports = Book;
