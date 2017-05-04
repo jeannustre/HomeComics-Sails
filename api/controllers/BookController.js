@@ -10,6 +10,7 @@ var fs = require('fs')
 var yauzl = require('yauzl')
 var path = require('path')
 var util = require('util')
+var Unrar = require('node-unrar')
 var Transform = require('stream').Transform
 // see https://github.com/thejoshwolfe/yauzl/
 
@@ -37,14 +38,19 @@ var Book = {
       if (files.length === 0) {
         return res.badRequest('No file was uploaded')
       }
-      var zipPath = files[0].fd
-      var fnLength = zipPath.length
-      var extension = zipPath.substring(fnLength - 4, fnLength)
+      var archivePath = files[0].fd
+      var fnLength = archivePath.length
+      var extension = archivePath.substring(fnLength - 4, fnLength)
       if (extension === ".cbz" || extension === ".zip") {
         console.log("Unarchiving zip file...")
-        yauzl.open(zipPath, {lazyEntries: true}, handleZipFile)
+        yauzl.open(archivePath, {lazyEntries: true}, handleZipFile)
       } else if (extension === ".cbr" || extension === ".rar") {
-        // handle unrar
+        console.log("Unarchiving rar file...")
+        var rar = new Unrar(archivePath)
+        rar.extract('./UNARCHIVED/', null, function(err) {
+          if (err) throw err
+          console.log("Unarchived rar file successfully")
+        })
       }
       return res.json({
         message: files.length + ' file(s) uploaded successfully!',
