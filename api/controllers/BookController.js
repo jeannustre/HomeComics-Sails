@@ -13,6 +13,7 @@ var util = require('util')
 var Unrar = require('unrar')
 var Transform = require('stream').Transform
 var dataFolder = "./UNARCHIVED/"
+var currentFolder = ""
 // see https://github.com/thejoshwolfe/yauzl/
 
 var Book = {
@@ -43,11 +44,11 @@ var Book = {
       var extension = archivePath.substring(archivePath.length - 4, archivePath.length)
       var bookName = files[0].filename.substring(0, files[0].filename.length - 4)
       console.log("Unarchiving book <" + bookName + "> with extension <" + extension + ">")
+      //currentFolder = bookName
       if (!fs.existsSync(dataFolder)){
         console.log("Creating data folder : " + dataFolder)
         fs.mkdirSync(dataFolder)
       }
-
       if (isZip(extension)) {
         console.log("Unarchiving zip file...")
         yauzl.open(archivePath, {lazyEntries: true}, handleZipFile)
@@ -79,23 +80,40 @@ function isZip(extension) {
 
 function makeDirSync(dir) {
   if (dir === ".") return
+  // do the parent === ./UNARCHIVED check here instead?
+  var parent = path.dirname(dir)
+  console.log("PARENT :::::: " + parent)
+  if (parent === "./UNARCHIVED") {
+    // this is the book root directory
+    console.log("ROOT FOLDER ::: " + dir)
+    currentFolder = dir
+  }
   if (!fs.existsSync(dir)){
-    console.log("makeDirSync: creating folder <" + dir + ">")
-    var parent = path.dirname(dir)
+    //console.log("makeDirSync: creating folder <" + dir + ">")
+
     console.log("makeDirSync: parent <" + parent + ">")
     if (!fs.existsSync(parent)) {
       makeDirSync(parent)
     }
     console.log("makeDirSync: unstacked")
     fs.mkdirSync(dir)
+  } else {
+    console.log("MAKEDIRSYNC : folder " + dir + " already exists")
   }
 }
 
 function makeDirAsync(dir, cb) {
   if (dir === ".") return cb()
+  var parent = path.dirname(dir)
+  if (parent === "./UNARCHIVED") {
+    // this is the book root directory
+    console.log("ROOT FOLDER ::: " + dir)
+    currentFolder = dir
+  }
   fs.stat(dir, function(err) {
     if (err == null) return cb() // folder already exists
-    var parent = path.dirname(dir)
+    console.log("PARENT :: " + parent)
+
     makeDirAsync(parent, function() {
       process.stdout.write(dir.replace(/\/$/, "") + "/\n")
       fs.mkdir(dir, cb)
@@ -109,7 +127,7 @@ function handleRarFile(err, entries) {
     var name = entries[i].name
     var type = entries[i].type
     if (type !== 'File') {
-      //console.log("(1/2) Creating folder: <" + name + ">")
+      console.log("(1/2) Creating folder: <" + name + ">")
       makeDirSync(dataFolder + name)
     }
   }
@@ -126,6 +144,9 @@ function handleRarFile(err, entries) {
       throw e
     }
   }
+  // now check contents
+  console.log(currentFolder)
+  console.log(getContents(currentFolder))
 }
 
 function handleZipFile(err, zipfile) {
@@ -139,6 +160,8 @@ function handleZipFile(err, zipfile) {
     handleCount--
     if (handleCount === 0) {
       console.log("all input and output handles closed")
+      console.log("contents of folder : ")
+      console.log(JSON.stringify(getContents(currentFolder)))
     }
   }
 
@@ -179,4 +202,19 @@ function handleZipFile(err, zipfile) {
       })
     }
   })
+}
+
+function getContents(dir) {
+  var results = []
+  console.log("getContents::dir = <" + dir + ">")
+  fs.readdirSync(dir).forEach(function(file) {
+    file = dir + '/' + file
+    var stat = fs.statSync(file)
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getContents(file))
+    } else {
+      console.log("getContents::file = <" + file + ">")
+    }
+  })
+  return results
 }
