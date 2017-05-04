@@ -10,8 +10,9 @@ var fs = require('fs')
 var yauzl = require('yauzl')
 var path = require('path')
 var util = require('util')
-var Unrar = require('node-unrar')
+var Unrar = require('unrar')
 var Transform = require('stream').Transform
+var dataFolder = "./UNARCHIVED/"
 // see https://github.com/thejoshwolfe/yauzl/
 
 var Book = {
@@ -42,13 +43,51 @@ var Book = {
       var pathLength = archivePath.length
       var archiveName = files[0].filename
       var extension = archivePath.substring(pathLength - 4, pathLength)
-      var name = archiveName.substring(0, archiveName.length - 4)
-      console.log("Unarchiving file <" + name + "> with extension <" + extension + ">")
+      var bookName = archiveName.substring(0, archiveName.length - 4)
+      console.log("Unarchiving book <" + bookName + "> with extension <" + extension + ">")
+
+
+      if (!fs.existsSync(dataFolder)){
+        console.log("Creating data folder : " + dataFolder)
+        fs.mkdirSync(dataFolder)
+      }
+
+
       if (extension === ".cbz" || extension === ".zip") {
         console.log("Unarchiving zip file...")
         yauzl.open(archivePath, {lazyEntries: true}, handleZipFile)
       } else if (extension === ".cbr" || extension === ".rar") {
+        rar = new Unrar(archivePath)
+
         console.log("Unarchiving rar file...")
+        rar.list(function(err, entries){
+          for (var i = 0; i < entries.length; i++) {
+            var name = entries[i].name
+            var type = entries[i].type
+            //console.log("First run, evaluating <" + name + " | " + type + ">")
+            if (type !== 'File') {
+              console.log("(1/2) Creating folder: <" + name + ">")
+              makeDirSync(dataFolder + name)
+            }
+          }
+          for (var i = 0; i < entries.length; i++) {
+            var name = entries[i].name
+            var type = entries[i].type
+            if (type !== 'File') {
+              continue;
+            }
+            console.log("(2/2) Creating file: <" + dataFolder + name + ">")
+            var stream = rar.stream(name)
+            var destName = dataFolder + name
+            try {
+              stream.pipe(fs.createWriteStream(destName))
+              //fs.writeFileSync(name, stream)
+            } catch (e) {
+              throw e
+            }
+          }
+        })
+        /*
         var rar = new Unrar(archivePath)
         // create directory
         mkdirp('./UNARCHIVED/' + name, function(err) {
@@ -58,7 +97,7 @@ var Book = {
         rar.extract('./UNARCHIVED/' + name + "/", null, function(err) {
           if (err) throw err
           console.log("Unarchived rar file successfully")
-        })
+        })*/
       }
       return res.json({
         message: files.length + ' file(s) uploaded successfully!',
@@ -69,6 +108,20 @@ var Book = {
 }
 
 module.exports = Book;
+
+function makeDirSync(dir) {
+  if (dir === ".") return
+  if (!fs.existsSync(dir)){
+    console.log("makeDirSync: creating folder <" + dir + ">")
+    var parent = path.dirname(dir)
+    console.log("makeDirSync: parent <" + parent + ">")
+    if (!fs.existsSync(parent)) {
+      makeDirSync(parent)
+    }
+    console.log("makeDirSync: unstacked")
+    fs.mkdirSync(dir)
+  }
+}
 
 function mkdirp(dir, cb) {
   if (dir === ".") return cb()
@@ -106,7 +159,9 @@ function handleZipFile(err, zipfile) {
   zipfile.on("entry", function(entry) {
     if (/\/$/.test(entry.fileName)) {
       // directory file names end with '/'
-      mkdirp(entry.fileName, function() {
+      var foldername = dataFolder + entry.fileName
+      console.log("ZIP creating folder : " + foldername)
+      mkdirp(foldername, function() {
         if (err) throw err;
         zipfile.readEntry()
       })
@@ -118,8 +173,11 @@ function handleZipFile(err, zipfile) {
           // report progress through large files
           var byteCount = 0
           var totalBytes = entry.uncompressedSize
+
+          var filename = dataFolder + entry.fileName
+          console.log("ZIP creating file : " + filename)
           var lastReportedString = byteCount + "/" + totalBytes + " 0%"
-          process.stdout.write(entry.fileName + "..." + lastReportedString)
+          process.stdout.write(filename + "..." + lastReportedString)
           function reportString(msg) {
             var clearString = ""
             for (var i = 0; i < lastReportedString.length; i++) {
@@ -150,7 +208,7 @@ function handleZipFile(err, zipfile) {
           }
 
           // pump file contents
-          var writeStream = fs.createWriteStream(entry.fileName)
+          var writeStream = fs.createWriteStream(filename)
           incrementHandleCount()
           writeStream.on("close", decrementHandleCount)
           readStream.pipe(filter).pipe(writeStream)
