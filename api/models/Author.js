@@ -9,6 +9,21 @@ module.exports = {
 
   attributes: {
 
+    name : {
+      type: 'string'
+    },
+
+    bio: {
+      type: 'string' // Author description - facultative
+    },
+
+    wroteBook: {
+      type: 'array' // array of Book.id
+    },
+
+    wroteSerie: {
+      type: 'array' // array of Serie.id
+    }
+
   }
 };
-

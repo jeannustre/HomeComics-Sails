@@ -9,6 +9,17 @@ module.exports = {
 
   attributes: {
 
+    name: {
+      type: 'string'
+    },
+
+    type: {
+      type: 'string' // e.g. "Comic", "Manga", "Artbook"
+    },
+
+    books: {
+      type: 'array' // array of Book.id
+    }
+
   }
 };
-
