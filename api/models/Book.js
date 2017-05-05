@@ -31,7 +31,11 @@ module.exports = {
 
     location: {
       type: 'string'
-    }
+    },
+
+    cover: {
+      type: 'string'
+    },
 
   }
 

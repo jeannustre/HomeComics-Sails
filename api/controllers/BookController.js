@@ -154,7 +154,8 @@ function rarCallback(req) {
       pages: bookContents.length,
       year: req.param("year", 0),
       location: loc,
-      contents: bookContents
+      contents: bookContents,
+      cover: bookContents[0]
     }).exec(function(err, records) {
       //console.log("Created book : \n" + JSON.stringify(records))
       console.log("Created Book with id " + records.id)
@@ -182,7 +183,8 @@ function zipCallback(req) {
           pages: bookContents.length,
           year: req.param("year", 0),
           location: loc,
-          contents: bookContents
+          contents: bookContents,
+          cover: bookContents[0]
         }).exec(function(err, records) {
           console.log("Created Book with id " + records.id)
         })
