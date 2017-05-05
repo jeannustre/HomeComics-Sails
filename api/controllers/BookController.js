@@ -137,7 +137,7 @@ function rarCallback(req) {
       var name = entries[i].name
       var type = entries[i].type
       if (type !== 'File') {
-        console.log("(1/2) Creating folder: <" + name + ">")
+        //console.log("(1/2) Creating folder: <" + name + ">")
         makeDirSync(dataFolder + name)
       }
     }
@@ -181,8 +181,16 @@ function zipCallback(req) {
       handleCount--
       if (handleCount === 0) {
         console.log("all input and output handles closed")
-        console.log("contents of folder : ")
-        console.log(JSON.stringify(getContents(currentFolder)))
+        var bookContents = getContents(currentFolder)
+        Book.create({
+          title: req.param("title", "No Title"),
+          author: req.param("author", "No Author"),
+          pages: bookContents.length,
+          year: req.param("year", 0),
+          contents: bookContents
+        }).exec(function(err, records) {
+          console.log("Created book : \n" + JSON.stringify(records))
+        })
       }
     }
 
@@ -226,20 +234,16 @@ function zipCallback(req) {
   }
 }
 
-
-
-
-
 function getContents(dir) {
   var results = []
-  console.log("getContents::dir = <" + dir + ">")
+  //console.log("getContents::dir = <" + dir + ">")
   fs.readdirSync(dir).forEach(function(file) {
     file = dir + '/' + file
     var stat = fs.statSync(file)
     if (stat && stat.isDirectory()) {
       results = results.concat(getContents(file))
     } else {
-      console.log("getContents::file = <" + file + ">")
+      //console.log("getContents::file = <" + file + ">")
       filelength = file.length
       file = file.substring(dataFolder.length, filelength)
       results.push(file)
