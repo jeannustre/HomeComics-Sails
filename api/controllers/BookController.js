@@ -86,20 +86,15 @@ function makeDirSync(dir) {
   if (dir === ".") return
   // do the parent === ./UNARCHIVED check here instead?
   var parent = path.dirname(dir)
-  console.log("PARENT :::::: " + parent)
   if (parent === "./UNARCHIVED") {
     // this is the book root directory
     console.log("ROOT FOLDER ::: " + dir)
     currentFolder = dir
   }
   if (!fs.existsSync(dir)){
-    //console.log("makeDirSync: creating folder <" + dir + ">")
-
-    console.log("makeDirSync: parent <" + parent + ">")
     if (!fs.existsSync(parent)) {
       makeDirSync(parent)
     }
-    console.log("makeDirSync: unstacked")
     fs.mkdirSync(dir)
   } else {
     console.log("MAKEDIRSYNC : folder " + dir + " already exists")
@@ -116,8 +111,6 @@ function makeDirAsync(dir, cb) {
   }
   fs.stat(dir, function(err) {
     if (err == null) return cb() // folder already exists
-    console.log("PARENT :: " + parent)
-
     makeDirAsync(parent, function() {
       process.stdout.write(dir.replace(/\/$/, "") + "/\n")
       fs.mkdir(dir, cb)
@@ -126,7 +119,6 @@ function makeDirAsync(dir, cb) {
 }
 
 function rarCallback(req) {
-  //console.log("BOZO : " + data)
   console.log("PARAM :: " + req.param("title"))
   console.log("PARAM :: " + req.param("author"))
   console.log("PARAM :: " + req.param("year"))
@@ -156,7 +148,6 @@ function rarCallback(req) {
     }
     // now check contents
     var bookContents = getContents(currentFolder)
-    console.log(bookContents)
     Book.create({
       title: req.param("title", "No Title"),
       author: req.param("author", "No Author"),
@@ -164,7 +155,8 @@ function rarCallback(req) {
       year: req.param("year", 0),
       contents: bookContents
     }).exec(function(err, records) {
-      console.log("Created book : \n" + JSON.stringify(records))
+      //console.log("Created book : \n" + JSON.stringify(records))
+      console.log("Created Book with id " + records.id)
     })
   }
 }
@@ -189,7 +181,7 @@ function zipCallback(req) {
           year: req.param("year", 0),
           contents: bookContents
         }).exec(function(err, records) {
-          console.log("Created book : \n" + JSON.stringify(records))
+          console.log("Created Book with id " + records.id)
         })
       }
     }
@@ -243,10 +235,14 @@ function getContents(dir) {
     if (stat && stat.isDirectory()) {
       results = results.concat(getContents(file))
     } else {
-      //console.log("getContents::file = <" + file + ">")
       filelength = file.length
       file = file.substring(dataFolder.length, filelength)
-      results.push(file)
+      var extension = file.substring(file.length - 4, file.length)
+      if (extension === ".jpg" || extension === "jpeg" || extension === "png") {
+        results.push(file)
+      } else {
+        console.log("Non-image file <" + file + "> not added to index")
+      }
     }
   })
   return results
