@@ -243,7 +243,7 @@ function getContents(dir) {
       filelength = file.length
       file = file.substring(dataFolder.length, filelength)
       var extension = file.substring(file.length - 4, file.length)
-      if (extension === ".jpg" || extension === "jpeg" || extension === "png") {
+      if (extension === ".jpg" || extension === "jpeg" || extension === ".png") {
         results.push(file)
       } else {
         console.log("Non-image file <" + file + "> not added to index")
