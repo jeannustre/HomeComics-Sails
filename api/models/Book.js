@@ -27,6 +27,10 @@ module.exports = {
 
     contents: {
       type: 'array'
+    },
+
+    location: {
+      type: 'string'
     }
 
   }

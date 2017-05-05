@@ -8,7 +8,7 @@
 var Books = {
 
 	all: function(req, res) {
-		return Book.query('SELECT book.title, book.author, book.pages, book.year, book.id FROM book', function (err, result){
+		return Book.query('SELECT book.title, book.author, book.pages, book.year, book.id, book.location FROM book', function (err, result){
 			if (err) {
     		return res.serverError(err);
   		}

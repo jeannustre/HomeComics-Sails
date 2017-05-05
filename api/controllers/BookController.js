@@ -129,7 +129,6 @@ function rarCallback(req) {
       var name = entries[i].name
       var type = entries[i].type
       if (type !== 'File') {
-        //console.log("(1/2) Creating folder: <" + name + ">")
         makeDirSync(dataFolder + name)
       }
     }
@@ -148,11 +147,13 @@ function rarCallback(req) {
     }
     // now check contents
     var bookContents = getContents(currentFolder)
+    var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
     Book.create({
       title: req.param("title", "No Title"),
       author: req.param("author", "No Author"),
       pages: bookContents.length,
       year: req.param("year", 0),
+      location: loc,
       contents: bookContents
     }).exec(function(err, records) {
       //console.log("Created book : \n" + JSON.stringify(records))
@@ -174,11 +175,13 @@ function zipCallback(req) {
       if (handleCount === 0) {
         console.log("all input and output handles closed")
         var bookContents = getContents(currentFolder)
+        var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
         Book.create({
           title: req.param("title", "No Title"),
           author: req.param("author", "No Author"),
           pages: bookContents.length,
           year: req.param("year", 0),
+          location: loc,
           contents: bookContents
         }).exec(function(err, records) {
           console.log("Created Book with id " + records.id)
