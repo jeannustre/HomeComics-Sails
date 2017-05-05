@@ -26,7 +26,7 @@ module.exports = {
     },
 
     contents: {
-      collection: 'Page'
+      type: 'array'
     }
 
   }
