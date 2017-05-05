@@ -13,28 +13,28 @@ module.exports = {
       type : 'string'
     },
 
-    author: {
-      type: 'string'
+    authors: {
+      type: 'array' // array of Author.id
     },
 
     pages: {
-      type: 'int'
+      type: 'int' // number of pages
     },
 
     year: {
-      type: 'int'
+      type: 'int' // date of publication
     },
 
     contents: {
-      type: 'array'
+      type: 'array' // array of strings representing the URL of each page, from the root folder
     },
 
     location: {
-      type: 'string'
+      type: 'string' // location of the first book folder
     },
 
     cover: {
-      type: 'string'
+      type: 'string' // contents[0]
     },
 
   }

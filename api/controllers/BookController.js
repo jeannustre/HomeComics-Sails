@@ -147,10 +147,12 @@ function rarCallback(req) {
     }
     // now check contents
     var bookContents = getContents(currentFolder)
-    var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
+    var loc = currentFolder.substring(dataFolder.length, currentFolder.length
+    //var authorsID = []
+    authors.push(req.param("author", "No Author"))
     Book.create({
       title: req.param("title", "No Title"),
-      author: req.param("author", "No Author"),
+      authors: [req.param("author", "No Author")],
       pages: bookContents.length,
       year: req.param("year", 0),
       location: loc,
@@ -158,6 +160,7 @@ function rarCallback(req) {
       cover: bookContents[0]
     }).exec(function(err, records) {
       //console.log("Created book : \n" + JSON.stringify(records))
+      console.log("Error: " + err)
       console.log("Created Book with id " + records.id)
     })
   }
@@ -179,13 +182,14 @@ function zipCallback(req) {
         var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
         Book.create({
           title: req.param("title", "No Title"),
-          author: req.param("author", "No Author"),
+          authors: [req.param("author", "No Author")],
           pages: bookContents.length,
           year: req.param("year", 0),
           location: loc,
           contents: bookContents,
           cover: bookContents[0]
         }).exec(function(err, records) {
+          console.log("Error: " + err)
           console.log("Created Book with id " + records.id)
         })
       }
