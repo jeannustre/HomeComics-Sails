@@ -11,6 +11,7 @@ var path = require('path')
 var util = require('util')
 var Unrar = require('unrar')
 var Transform = require('stream').Transform
+var Archive = require('../archiveUtils.js')
 
 module.exports = {
 
@@ -41,8 +42,8 @@ module.exports = {
   },
 
   fromZip: function(options, cb) {
-    yauzl.open(options.path, {lazyEntries: true}, zipCallback(options))
-
+    console.log("REQUIRE  : " + JSON.stringify(Archive))
+    yauzl.open(options.path, {lazyEntries: true}, zipCallback(options, cb))
   },
 
   fromRar: function(options, cb) {
@@ -56,7 +57,7 @@ module.exports = {
 // ZIP
 //
 
-function zipCallback(params) {
+function zipCallback(params, cb) {
   return function handleZipFile(err, zipfile) {
     if (err) throw err;
 
@@ -68,8 +69,19 @@ function zipCallback(params) {
       handleCount--
       if (handleCount === 0) {
         console.log("all input and output handles closed")
-        var bookContents = getContents(currentFolder, params.dataFolder)
+        console.log("Archive : <" + JSON.stringify(Archive) + ">")
+        var bookContents = Archive.getContents(currentFolder, params.dataFolder)
         var loc = currentFolder.substring(params.dataFolder.length, currentFolder.length)
+
+        var bookParams = {
+          title: params.title,
+          authors: [],
+          pages: bookContents.length,
+          year: params.year,
+          location: loc,
+          contents: bookContents,
+          cover: bookContents[0]
+        }
 
         Author.findOne({
           name: params.author
@@ -84,38 +96,23 @@ function zipCallback(params) {
             }).exec(function(err, newAuthor) {
               if (err) return res.serverError(err)
               console.log("Created new author : <" + JSON.stringify(newAuthor) + ">")
-              Book.create({
-                title: params.title,
-                authors: [newAuthor.id],
-                pages: bookContents.length,
-                year: params.year,
-                location: loc,
-                contents: bookContents,
-                cover: bookContents[0]
-              }).exec(function(err, records) {
+              bookParams.authors.push(newAuthor.id)
+              console.log("Creating book with params: " + JSON.stringify(bookParams))
+              Book.create(bookParams).exec(function(err, records) {
                 newAuthor.wrote.push(records.id)
                 newAuthor.save()
-                console.log("Error: " + err)
-                console.log("Created Book with id " + records.id)
+                console.log("Created Book with id <" + records.id + "> and new Author with id <" + newAuthor.id + ">")
+                cb(records)
               })
             })
           } else { // author already exists
-            console.log("author does already exist, adding book..")
-            Book.create({
-              title: params.title,
-              authors: [author.id],
-              pages: bookContents.length,
-              year: params.year,
-              location: loc,
-              contents: bookContents,
-              cover: bookContents[0]
-            }).exec(function(err, records) {
+            bookParams.authors.push(author.id)
+            Book.create(bookParams).exec(function(err, records) {
               if (err) return res.serverError(err)
-              // created book, adding Book.id to Author.wrote
               author.wrote.push(records.id)
               author.save()
-              //console.log("Created book : \n" + JSON.stringify(records))
-              console.log("Created Book with id " + records.id + "and author id " + author.id)
+              console.log("Created Book with id <" + records.id + "> and Author with id <" + author.id + ">")
+              cb(records)
             })
           }
         })
@@ -132,7 +129,7 @@ function zipCallback(params) {
     zipfile.on("entry", function(entry) {
       if (/\/$/.test(entry.fileName)) {
         var foldername = params.dataFolder + entry.fileName
-        makeDirAsync(foldername, function() {
+        Archive.makeDirAsync(foldername, function() {
           if (err) throw err;
           zipfile.readEntry()
         })
@@ -160,7 +157,7 @@ function zipCallback(params) {
   }
 }
 
-function getContents(dir, dataFolder) {
+/*function getContents(dir, dataFolder) {
   var results = []
   //console.log("getContents::dir = <" + dir + ">")
   fs.readdirSync(dir).forEach(function(file) {
@@ -180,17 +177,18 @@ function getContents(dir, dataFolder) {
     }
   })
   return results
-}
+}*/
 
 
 // TODO: move this to a module for conciseness?
-function makeDirAsync(dir, cb) {
+/*function makeDirAsync(dir, cb) {
   if (dir === ".") return cb()
   var parent = path.dirname(dir)
   if (parent === "./UNARCHIVED") {
     // this is the book root directory
     console.log("ROOT FOLDER ::: " + dir)
     currentFolder = dir
+    console.log("currentFolder :" + currentFolder)
   }
   fs.stat(dir, function(err) {
     if (err == null) return cb() // folder already exists
@@ -199,4 +197,4 @@ function makeDirAsync(dir, cb) {
       fs.mkdir(dir, cb)
     })
   })
-}
+}*/

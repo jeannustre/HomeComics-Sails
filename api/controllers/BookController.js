@@ -40,9 +40,9 @@ var BookC = {
     });
     res.end(
       '<form action="http://localhost:1337/book/doUpload" enctype="multipart/form-data" method="post" accept-charset="UTF-8">'+
-      '<input type="text" name="title"><br>'+
-      '<input type="text" name="author"><br>'+
-      '<input type="text" name="year"><br>'+
+      '<p>Title: </p><input type="text" name="title"><br>'+
+      '<p>Author: </p><input type="text" name="author"><br>'+
+      '<p>Year: </p><input type="text" name="year"><br>'+
       '<input type="file" name="archive" multiple="multiple"><br>'+
       '<input type="submit" value="Upload">'+
       '</form>'
@@ -60,16 +60,12 @@ var BookC = {
       // 800MB
       maxBytes: 800000000
     }, function(err, files) {
-      if (err) {
-        return res.serverError(err)
-      }
-      if (files.length === 0) {
-        return res.badRequest('No file was uploaded')
-      }
+      if (err) return res.serverError(err)
+      if (files.length === 0) return res.badRequest('No file was uploaded')
       var archivePath = files[0].fd
       var extension = archivePath.substring(archivePath.length - 4, archivePath.length)
       var bookName = files[0].filename.substring(0, files[0].filename.length - 4)
-      console.log("Unarchiving book <" + bookName + "> with extension <" + extension + ">")
+      console.log("Uploaded book <" + bookName + "> with extension <" + extension + ">")
       //currentFolder = bookName
       if (!fs.existsSync(dataFolder)){
         console.log("Creating data folder : " + dataFolder)
@@ -82,10 +78,9 @@ var BookC = {
           title: req.param('title'),
           path: archivePath,
           dataFolder: dataFolder
-        }, function() {
-          console.log("--- fromZip over ---")
+        }, function(book) {
+          return res.json(book)
         })
-        console.log("Unarchiving zip file...")
       } else if (isRar(extension)) {
         rar = new Unrar(archivePath)
         console.log("Unarchiving rar file...")
@@ -93,10 +88,10 @@ var BookC = {
       } else {
         console.log("wrong file extension")
       }
-      return res.json({
+      /*return res.json({
         message: files.length + ' file(s) uploaded successfully!',
         files: files
-      })
+      })*/
     })
 
   }
