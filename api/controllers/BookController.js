@@ -280,89 +280,84 @@ function zipCallback(req) {
               })
             })
           } else { // author already exists
-              console.log("author does already exist, adding book..")
-
-              Book.create({
-                title: req.param("title", "No Title"),
-                authors: [author.id],
-                pages: bookContents.length,
-                year: req.param("year", 0),
-                location: loc,
-                contents: bookContents,
-                cover: bookContents[0]
-              }).exec(function(err, records) {
-                if (err) return res.serverError(err)
-                // created book, adding Book.id to Author.wrote
-                author.wrote.push(records.id)
-                author.save()
-                console.log("added id of book to author " + author.id)
-                //console.log("Created book : \n" + JSON.stringify(records))
-                console.log("Error: " + err)
-                console.log("Created Book with id " + records.id)
-              })
-            }
-          })
-        } //endif handleCount == 0
-      } // end decrementHandleCount
-
-      incrementHandleCount()
-      zipfile.on("close", function() {
-        console.log("closed input file")
-        decrementHandleCount()
-      })
-
-      zipfile.readEntry()
-      zipfile.on("entry", function(entry) {
-        if (/\/$/.test(entry.fileName)) {
-          var foldername = dataFolder + entry.fileName
-          makeDirAsync(foldername, function() {
-            if (err) throw err;
-            zipfile.readEntry()
-          })
-        } else {
-          makeDirAsync(path.dirname(entry.fileName), function() {
-            zipfile.openReadStream(entry, function(err, readStream) {
-              if (err) throw err
-              // report progress through large files
-              var filename = dataFolder + entry.fileName
-              var filter = new Transform()
-              filter._transform = function(chunk, encoding, cb) {
-                cb(null, chunk)
-              }
-              filter._flush = function(cb) {
-                cb()
-                zipfile.readEntry()
-              }
-              // pump file contents
-              var writeStream = fs.createWriteStream(filename)
-              incrementHandleCount()
-              writeStream.on("close", decrementHandleCount)
-              readStream.pipe(filter).pipe(writeStream)
+            console.log("author does already exist, adding book..")
+            Book.create({
+              title: req.param("title", "No Title"),
+              authors: [author.id],
+              pages: bookContents.length,
+              year: req.param("year", 0),
+              location: loc,
+              contents: bookContents,
+              cover: bookContents[0]
+            }).exec(function(err, records) {
+              if (err) return res.serverError(err)
+              // created book, adding Book.id to Author.wrote
+              author.wrote.push(records.id)
+              author.save()
+              //console.log("Created book : \n" + JSON.stringify(records))
+              console.log("Created Book with id " + records.id + "and author id " + author.id)
             })
-          })
-        }
-      })
-    }
-  }
+          }
+        })
+      } //endif handleCount == 0
+    } // end decrementHandleCount
 
-  function getContents(dir) {
-    var results = []
-    //console.log("getContents::dir = <" + dir + ">")
-    fs.readdirSync(dir).forEach(function(file) {
-      file = dir + '/' + file
-      var stat = fs.statSync(file)
-      if (stat && stat.isDirectory()) {
-        results = results.concat(getContents(file))
+    incrementHandleCount()
+    zipfile.on("close", function() {
+      console.log("closed input file")
+      decrementHandleCount()
+    })
+
+    zipfile.readEntry()
+    zipfile.on("entry", function(entry) {
+      if (/\/$/.test(entry.fileName)) {
+        var foldername = dataFolder + entry.fileName
+        makeDirAsync(foldername, function() {
+          if (err) throw err;
+          zipfile.readEntry()
+        })
       } else {
-        filelength = file.length
-        file = file.substring(dataFolder.length, filelength)
-        var extension = file.substring(file.length - 4, file.length)
-        if (extension === ".jpg" || extension === "jpeg" || extension === ".png") {
-          results.push(file)
-        } else {
-          console.log("Non-image file <" + file + "> not added to index")
-        }
+        zipfile.openReadStream(entry, function(err, readStream) {
+          if (err) throw err
+          // report progress through large files
+          var filename = dataFolder + entry.fileName
+          var filter = new Transform()
+          filter._transform = function(chunk, encoding, cb) {
+            cb(null, chunk)
+          }
+          filter._flush = function(cb) {
+            cb()
+            zipfile.readEntry()
+          }
+          // pump file contents
+          var writeStream = fs.createWriteStream(filename)
+          incrementHandleCount()
+          writeStream.on("close", decrementHandleCount)
+          readStream.pipe(filter).pipe(writeStream)
+        })
       }
     })
-    return results
   }
+}
+
+function getContents(dir) {
+  var results = []
+  //console.log("getContents::dir = <" + dir + ">")
+  fs.readdirSync(dir).forEach(function(file) {
+    file = dir + '/' + file
+    var stat = fs.statSync(file)
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getContents(file))
+    } else {
+      filelength = file.length
+      file = file.substring(dataFolder.length, filelength)
+      var extension = file.substring(file.length - 4, file.length)
+      if (extension === ".jpg" || extension === "jpeg" || extension === ".png") {
+        results.push(file)
+      } else {
+        console.log("Non-image file <" + file + "> not added to index")
+      }
+    }
+  })
+  return results
+}
