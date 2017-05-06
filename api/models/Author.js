@@ -17,13 +17,9 @@ module.exports = {
       type: 'string' // Author description - facultative
     },
 
-    wroteBook: {
+    wrote: {
       type: 'array' // array of Book.id
     },
-
-    wroteSerie: {
-      type: 'array' // array of Serie.id
-    }
 
   }
 };

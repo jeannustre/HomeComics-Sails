@@ -142,6 +142,10 @@ function makeDirAsync(dir, cb) {
   })
 }
 
+//
+// RAR
+//
+
 function rarCallback(req) {
   console.log("PARAM :: " + req.param("title"))
   console.log("PARAM :: " + req.param("author"))
@@ -172,21 +176,63 @@ function rarCallback(req) {
     // now check contents
     var bookContents = getContents(currentFolder)
     var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
-      var authorsID = []
-      authorsID.push(req.param("author", "No Author"))
-      authorsID.push("FillerAuthor", "")
-    Book.create({
-      title: req.param("title", "No Title"),
-      authors: authorsID,
-      pages: bookContents.length,
-      year: req.param("year", 0),
-      location: loc,
-      contents: bookContents,
-      cover: bookContents[0]
-    }).exec(function(err, records) {
-      //console.log("Created book : \n" + JSON.stringify(records))
-      console.log("Error: " + err)
-      console.log("Created Book with id " + records.id)
+    var authorsID = []
+    authorsID.push(req.param("author", "No Author"))
+    authorsID.push("FillerAuthor", "")
+
+    // Checking if provided author exists
+    Author.findOne({
+      name: req.param("author")
+    }).exec(function(err, author){
+      if (err) return res.serverError(err)
+      if (!author) { // author does not exist, creating
+        console.log("author does not exist yet, creating..")
+        Author.create({
+          name: req.param("author"),
+          bio: "",
+          wrote: []
+        }).exec(function(err, newAuthor) {
+          if (err) return res.serverError(err)
+          console.log("Created new author : <" + JSON.stringify(newAuthor) + ">")
+          Book.create({ // author created, now creating book
+            title: req.param("title", "No Title"),
+            authors: [newAuthor.id],
+            pages: bookContents.length,
+            year: req.param("year", 0),
+            location: loc,
+            contents: bookContents,
+            cover: bookContents[0]
+          }).exec(function(err, records) {
+            if (err) return res.serverError(err)
+            // created book, adding Book.id to Author.wrote
+            newAuthor.wrote.push(records.id)
+            newAuthor.save()
+            console.log("added id of book to author " + newAuthor.id)
+            console.log("Error: " + err)
+            console.log("Created Book with id " + records.id)
+          })
+        })
+      } else { // author already exists, creating book
+        console.log("author does already exist, adding book..")
+        Book.create({
+          title: req.param("title", "No Title"),
+          authors: [author.id],
+          pages: bookContents.length,
+          year: req.param("year", 0),
+          location: loc,
+          contents: bookContents,
+          cover: bookContents[0]
+          }).exec(function(err, records) {
+          if (err) return res.serverError(err)
+          // created book, adding Book.id to Author.wrote
+          author.wrote.push(records.id)
+          author.save()
+          console.log("added id of book to author " + author.id)
+          //console.log("Created book : \n" + JSON.stringify(records))
+          console.log("Error: " + err)
+          console.log("Created Book with id " + records.id)
+        })
+      }
     })
   }
 }
