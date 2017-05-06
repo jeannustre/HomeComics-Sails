@@ -16,24 +16,12 @@ var dataFolder = "./UNARCHIVED/"
 var currentFolder = ""
 // see https://github.com/thejoshwolfe/yauzl/
 
+//TODO: http://usejsdoc.org
+
 var BookC = {
 
+  // /book returns all Books as json, excluding Book.contents
   index: function(req, res) {
-    res.writeHead(200, {
-      'content-type': 'text/html'
-    });
-    res.end(
-      '<form action="http://localhost:1337/book/upload" enctype="multipart/form-data" method="post" accept-charset="UTF-8">'+
-      '<input type="text" name="title"><br>'+
-      '<input type="text" name="author"><br>'+
-      '<input type="text" name="year"><br>'+
-      '<input type="file" name="archive" multiple="multiple"><br>'+
-      '<input type="submit" value="Upload">'+
-      '</form>'
-    )
-  },
-
-  all: function(req, res) {
     Book.find().exec(function(err, books) {
       if (err) {
         return res.serverError(err)
@@ -47,7 +35,29 @@ var BookC = {
     })
 	},
 
+  // /book/upload returns a form to upload cbz/cbr
   upload: function(req, res) {
+    res.writeHead(200, {
+      'content-type': 'text/html'
+    });
+    res.end(
+      '<form action="http://localhost:1337/book/doUpload" enctype="multipart/form-data" method="post" accept-charset="UTF-8">'+
+      '<input type="text" name="title"><br>'+
+      '<input type="text" name="author"><br>'+
+      '<input type="text" name="year"><br>'+
+      '<input type="file" name="archive" multiple="multiple"><br>'+
+      '<input type="submit" value="Upload">'+
+      '</form>'
+    )
+  },
+
+  // test
+  read: function(req, res) {
+    return res.send("okkkk")
+  },
+
+  // called by /book/upload input
+  doUpload: function(req, res) {
     req.file('archive').upload({
       // 800MB
       maxBytes: 800000000
