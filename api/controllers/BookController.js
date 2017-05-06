@@ -76,8 +76,16 @@ var BookC = {
         fs.mkdirSync(dataFolder)
       }
       if (isZip(extension)) {
+        Book.fromZip({
+          author: req.param('author'),
+          year: req.param('year'),
+          title: req.param('title'),
+          path: archivePath,
+          dataFolder: dataFolder
+        }, function() {
+          console.log("--- fromZip over ---")
+        })
         console.log("Unarchiving zip file...")
-        yauzl.open(archivePath, {lazyEntries: true}, zipCallback(req))
       } else if (isRar(extension)) {
         rar = new Unrar(archivePath)
         console.log("Unarchiving rar file...")
@@ -123,23 +131,6 @@ function makeDirSync(dir) {
   } else {
     console.log("MAKEDIRSYNC : folder " + dir + " already exists")
   }
-}
-
-function makeDirAsync(dir, cb) {
-  if (dir === ".") return cb()
-  var parent = path.dirname(dir)
-  if (parent === "./UNARCHIVED") {
-    // this is the book root directory
-    console.log("ROOT FOLDER ::: " + dir)
-    currentFolder = dir
-  }
-  fs.stat(dir, function(err) {
-    if (err == null) return cb() // folder already exists
-    makeDirAsync(parent, function() {
-      process.stdout.write(dir.replace(/\/$/, "") + "/\n")
-      fs.mkdir(dir, cb)
-    })
-  })
 }
 
 //
@@ -234,113 +225,7 @@ function rarCallback(req) {
   }
 }
 
-//
-// ZIP
-//
 
-function zipCallback(req) {
-  return function handleZipFile(err, zipfile) {
-    if (err) throw err;
-
-    var handleCount = 0
-    function incrementHandleCount() {
-      handleCount++
-    }
-    function decrementHandleCount() {
-      handleCount--
-      if (handleCount === 0) {
-        console.log("all input and output handles closed")
-        var bookContents = getContents(currentFolder)
-        var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
-
-        Author.findOne({
-          name: req.param("author")
-        }).exec(function(err, author){
-          if (err) return res.serverError(err)
-          if (!author) { // author does not exist, creating
-            console.log("author does not exist yet, creating..")
-            Author.create({
-              name: req.param("author"),
-              bio: "",
-              wrote: []
-            }).exec(function(err, newAuthor) {
-              if (err) return res.serverError(err)
-              console.log("Created new author : <" + JSON.stringify(newAuthor) + ">")
-              Book.create({
-                title: req.param("title", "No Title"),
-                authors: [newAuthor.id],
-                pages: bookContents.length,
-                year: req.param("year", 0),
-                location: loc,
-                contents: bookContents,
-                cover: bookContents[0]
-              }).exec(function(err, records) {
-                newAuthor.wrote.push(records.id)
-                newAuthor.save()
-                console.log("Error: " + err)
-                console.log("Created Book with id " + records.id)
-              })
-            })
-          } else { // author already exists
-            console.log("author does already exist, adding book..")
-            Book.create({
-              title: req.param("title", "No Title"),
-              authors: [author.id],
-              pages: bookContents.length,
-              year: req.param("year", 0),
-              location: loc,
-              contents: bookContents,
-              cover: bookContents[0]
-            }).exec(function(err, records) {
-              if (err) return res.serverError(err)
-              // created book, adding Book.id to Author.wrote
-              author.wrote.push(records.id)
-              author.save()
-              //console.log("Created book : \n" + JSON.stringify(records))
-              console.log("Created Book with id " + records.id + "and author id " + author.id)
-            })
-          }
-        })
-      } //endif handleCount == 0
-    } // end decrementHandleCount
-
-    incrementHandleCount()
-    zipfile.on("close", function() {
-      console.log("closed input file")
-      decrementHandleCount()
-    })
-
-    zipfile.readEntry()
-    zipfile.on("entry", function(entry) {
-      if (/\/$/.test(entry.fileName)) {
-        var foldername = dataFolder + entry.fileName
-        makeDirAsync(foldername, function() {
-          if (err) throw err;
-          zipfile.readEntry()
-        })
-      } else {
-        zipfile.openReadStream(entry, function(err, readStream) {
-          if (err) throw err
-          // report progress through large files
-          var filename = dataFolder + entry.fileName
-          var filter = new Transform()
-          filter._transform = function(chunk, encoding, cb) {
-            cb(null, chunk)
-          }
-          filter._flush = function(cb) {
-            cb()
-            zipfile.readEntry()
-          }
-          // pump file contents
-          var writeStream = fs.createWriteStream(filename)
-          incrementHandleCount()
-          writeStream.on("close", decrementHandleCount)
-          readStream.pipe(filter).pipe(writeStream)
-        })
-      }
-    })
-  }
-}
 
 function getContents(dir) {
   var results = []
