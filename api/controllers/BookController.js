@@ -24,14 +24,14 @@ var BookC = {
   index: function(req, res) {
     Book.find({
       where: {},
-      select: ['title', 'authors', 'pages', 'year', 'location', 'cover']
+      select: ['title', 'authors', 'pages', 'year', 'location', 'cover', 'id']
     }).exec(function(err, books) {
       if (err) {
         return res.serverError(err)
       }
       return res.json(books);
     })
-	},
+  },
 
   // /book/upload returns a form to upload cbz/cbr
   upload: function(req, res) {
@@ -174,9 +174,6 @@ function rarCallback(req) {
     // now check contents
     var bookContents = getContents(currentFolder)
     var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
-    var authorsID = []
-    authorsID.push(req.param("author", "No Author"))
-    authorsID.push("FillerAuthor", "")
 
     // Checking if provided author exists
     Author.findOne({
@@ -220,7 +217,7 @@ function rarCallback(req) {
           location: loc,
           contents: bookContents,
           cover: bookContents[0]
-          }).exec(function(err, records) {
+        }).exec(function(err, records) {
           if (err) return res.serverError(err)
           // created book, adding Book.id to Author.wrote
           author.wrote.push(records.id)
@@ -253,82 +250,119 @@ function zipCallback(req) {
         console.log("all input and output handles closed")
         var bookContents = getContents(currentFolder)
         var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
-        var authorsID = []
-        authorsID.push(req.param("author", "No Author"))
-        authorsID.push("FillerAuthor", "")
-        Book.create({
-          title: req.param("title", "No Title"),
-          authors: authorsID,
-          pages: bookContents.length,
-          year: req.param("year", 0),
-          location: loc,
-          contents: bookContents,
-          cover: bookContents[0]
-        }).exec(function(err, records) {
-          console.log("Error: " + err)
-          console.log("Created Book with id " + records.id)
-        })
-      }
-    }
 
-    incrementHandleCount()
-    zipfile.on("close", function() {
-      console.log("closed input file")
-      decrementHandleCount()
-    })
+        Author.findOne({
+          name: req.param("author")
+        }).exec(function(err, author){
+          if (err) return res.serverError(err)
+          if (!author) { // author does not exist, creating
+            console.log("author does not exist yet, creating..")
+            Author.create({
+              name: req.param("author"),
+              bio: "",
+              wrote: []
+            }).exec(function(err, newAuthor) {
+              if (err) return res.serverError(err)
+              console.log("Created new author : <" + JSON.stringify(newAuthor) + ">")
+              Book.create({
+                title: req.param("title", "No Title"),
+                authors: [newAuthor.id],
+                pages: bookContents.length,
+                year: req.param("year", 0),
+                location: loc,
+                contents: bookContents,
+                cover: bookContents[0]
+              }).exec(function(err, records) {
+                newAuthor.wrote.push(records.id)
+                newAuthor.save()
+                console.log("Error: " + err)
+                console.log("Created Book with id " + records.id)
+              })
+            })
+          } else { // author already exists
+              console.log("author does already exist, adding book..")
 
-    zipfile.readEntry()
-    zipfile.on("entry", function(entry) {
-      if (/\/$/.test(entry.fileName)) {
-        var foldername = dataFolder + entry.fileName
-        makeDirAsync(foldername, function() {
-          if (err) throw err;
-          zipfile.readEntry()
-        })
-      } else {
-        makeDirAsync(path.dirname(entry.fileName), function() {
-          zipfile.openReadStream(entry, function(err, readStream) {
-            if (err) throw err
-            // report progress through large files
-            var filename = dataFolder + entry.fileName
-            var filter = new Transform()
-            filter._transform = function(chunk, encoding, cb) {
-              cb(null, chunk)
+              Book.create({
+                title: req.param("title", "No Title"),
+                authors: [author.id],
+                pages: bookContents.length,
+                year: req.param("year", 0),
+                location: loc,
+                contents: bookContents,
+                cover: bookContents[0]
+              }).exec(function(err, records) {
+                if (err) return res.serverError(err)
+                // created book, adding Book.id to Author.wrote
+                author.wrote.push(records.id)
+                author.save()
+                console.log("added id of book to author " + author.id)
+                //console.log("Created book : \n" + JSON.stringify(records))
+                console.log("Error: " + err)
+                console.log("Created Book with id " + records.id)
+              })
             }
-            filter._flush = function(cb) {
-              cb()
-              zipfile.readEntry()
-            }
-            // pump file contents
-            var writeStream = fs.createWriteStream(filename)
-            incrementHandleCount()
-            writeStream.on("close", decrementHandleCount)
-            readStream.pipe(filter).pipe(writeStream)
           })
-        })
+        } //endif handleCount == 0
+      } // end decrementHandleCount
+
+      incrementHandleCount()
+      zipfile.on("close", function() {
+        console.log("closed input file")
+        decrementHandleCount()
+      })
+
+      zipfile.readEntry()
+      zipfile.on("entry", function(entry) {
+        if (/\/$/.test(entry.fileName)) {
+          var foldername = dataFolder + entry.fileName
+          makeDirAsync(foldername, function() {
+            if (err) throw err;
+            zipfile.readEntry()
+          })
+        } else {
+          makeDirAsync(path.dirname(entry.fileName), function() {
+            zipfile.openReadStream(entry, function(err, readStream) {
+              if (err) throw err
+              // report progress through large files
+              var filename = dataFolder + entry.fileName
+              var filter = new Transform()
+              filter._transform = function(chunk, encoding, cb) {
+                cb(null, chunk)
+              }
+              filter._flush = function(cb) {
+                cb()
+                zipfile.readEntry()
+              }
+              // pump file contents
+              var writeStream = fs.createWriteStream(filename)
+              incrementHandleCount()
+              writeStream.on("close", decrementHandleCount)
+              readStream.pipe(filter).pipe(writeStream)
+            })
+          })
+        }
+      })
+    }
+  }
+
+  function getContents(dir) {
+    var results = []
+    //console.log("getContents::dir = <" + dir + ">")
+    fs.readdirSync(dir).forEach(function(file) {
+      file = dir + '/' + file
+      var stat = fs.statSync(file)
+      if (stat && stat.isDirectory()) {
+        results = results.concat(getContents(file))
+      } else {
+        filelength = file.length
+        file = file.substring(dataFolder.length, filelength)
+        var extension = file.substring(file.length - 4, file.length)
+        if (extension === ".jpg" || extension === "jpeg" || extension === ".png") {
+          results.push(file)
+        } else {
+          console.log("Non-image file <" + file + "> not added to index")
+        }
       }
     })
+    return results
   }
-}
-
-function getContents(dir) {
-  var results = []
-  //console.log("getContents::dir = <" + dir + ">")
-  fs.readdirSync(dir).forEach(function(file) {
-    file = dir + '/' + file
-    var stat = fs.statSync(file)
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getContents(file))
-    } else {
-      filelength = file.length
-      file = file.substring(dataFolder.length, filelength)
-      var extension = file.substring(file.length - 4, file.length)
-      if (extension === ".jpg" || extension === "jpeg" || extension === ".png") {
-        results.push(file)
-      } else {
-        console.log("Non-image file <" + file + "> not added to index")
-      }
-    }
-  })
-  return results
-}
