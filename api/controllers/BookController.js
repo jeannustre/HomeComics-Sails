@@ -22,14 +22,12 @@ var BookC = {
 
   // /book returns all Books as json, excluding Book.contents
   index: function(req, res) {
-    Book.find().exec(function(err, books) {
+    Book.find({
+      where: {},
+      select: ['title', 'authors', 'pages', 'year', 'location', 'cover']
+    }).exec(function(err, books) {
       if (err) {
         return res.serverError(err)
-      }
-      var i = 0
-      while (i < books.length) {
-        delete books[i].contents
-        i++
       }
       return res.json(books);
     })
@@ -236,6 +234,10 @@ function rarCallback(req) {
     })
   }
 }
+
+//
+// ZIP
+//
 
 function zipCallback(req) {
   return function handleZipFile(err, zipfile) {
