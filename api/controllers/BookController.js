@@ -225,6 +225,7 @@ function rarCallback(req) {
 function getContents(dir) {
   var results = []
   //console.log("getContents::dir = <" + dir + ">")
+  console.log("XX-getContents from bookController.js")
   fs.readdirSync(dir).forEach(function(file) {
     file = dir + '/' + file
     var stat = fs.statSync(file)
