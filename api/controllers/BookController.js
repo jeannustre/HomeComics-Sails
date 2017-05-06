@@ -96,6 +96,8 @@ var BookC = {
 
 module.exports = BookC;
 
+//TODO: move all the mess below here into model methods
+
 function isRar(extension) {
   return extension === ".cbr" || extension === ".rar" ? true : false
 }
