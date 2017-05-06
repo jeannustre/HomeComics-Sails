@@ -16,7 +16,6 @@ var Archive = require('../archiveUtils.js')
 module.exports = {
 
   attributes: {
-
     title: {
       type : 'string'
     },
@@ -38,121 +37,162 @@ module.exports = {
     cover: {
       type: 'string' // contents[0]
     },
-
   },
 
+  // public methods
   fromZip: function(options, cb) {
-    console.log("REQUIRE  : " + JSON.stringify(Archive))
     yauzl.open(options.path, {lazyEntries: true}, zipCallback(options, cb))
   },
-
   fromRar: function(options, cb) {
-
+    rar = new Unrar(options.path)
+    rar.list(rarCallback(options, cb))
   }
-
 };
 
-
-//
-// ZIP
-//
+function rarCallback(options, cb) {
+  return function handleRarFile(err, entries) {
+    for (var i = 0; i < entries.length; i++) { // We run through all entries first
+      if (entries[i].type !== 'File') { // If an entry is a directory...
+        Archive.makeDirSync(options.dataFolder + entries[i].name) // create it
+      }
+    }
+    for (var i = 0; i < entries.length; i++) {  // Then we run through them all again...
+      var name = entries[i].name // How unoptimized. Boo.
+      if (entries[i].type !== 'File')  continue; // Just skip the directories this time
+      try { // and if it's a file, write it
+        rar.stream(name).pipe(fs.createWriteStream(options.dataFolder + name))
+      } catch (e) {
+        throw e
+      }
+    } // Unarchiving complete, registering Book
+    var bookContents = Archive.getContents(currentFolder, options.dataFolder)
+    var bookParams = { // We create common parameters for the book
+      title: options.title,
+      authors: [], // This will be filled when an Author has been found or created
+      pages: bookContents.length,
+      year: options.year,
+      location: currentFolder.substring(options.dataFolder.length, currentFolder.length),
+      contents: bookContents,
+      cover: bookContents[0]
+    }
+    Author.findOne({ // We try to find an Author...
+      name: options.author // with the provided name
+    }).exec(function(err, author){
+      if (err) return res.serverError(err)
+      if (!author) { // If we don't find one,
+        Author.create({ // We create one...
+          name: options.author, // with the supplied name...
+          bio: "", // an empty biography...
+          wrote: [] // and an empty array of Book.id, which we will update afterwards
+        }).exec(function(err, newAuthor) {
+          if (err) return res.serverError(err)
+          bookParams.author.push(newAuthor.id) // Update parameters with the new Author's id
+          Book.create(bookParams).exec(function(err, records) { // Once the Book is created...
+            if (err) return res.serverError(err)
+            newAuthor.wrote.push(records.id) // ... we add it's id to the Author's array of Book.id
+            newAuthor.save()
+            cb(records) // Finally, we return the newly created Book as json
+          })
+        })
+      } else { // We found an Author!
+        bookParams.author.push(author.id) // Same as above, but with the extisting Author info
+        Book.create(bookParams).exec(function(err, records) {
+          if (err) return res.serverError(err)
+          author.wrote.push(records.id) //
+          author.save()
+          cb(records)
+        })
+      }
+    })
+  }
+}
 
 function zipCallback(params, cb) {
   return function handleZipFile(err, zipfile) {
     if (err) throw err;
-
-    var handleCount = 0
-    function incrementHandleCount() {
+    var handleCount = 0 // This will help us keep track of opened file handlers
+    function incrementHandleCount() { // TODO : This seems useless
       handleCount++
     }
     function decrementHandleCount() {
       handleCount--
-      if (handleCount === 0) {
-        console.log("all input and output handles closed")
-        console.log("Archive : <" + JSON.stringify(Archive) + ">")
-        var bookContents = Archive.getContents(currentFolder, params.dataFolder)
-        var loc = currentFolder.substring(params.dataFolder.length, currentFolder.length)
-
-        var bookParams = {
+      if (handleCount === 0) { // If no more files are being written to, the unarchiving is over
+        var bookContents = Archive.getContents(currentFolder, params.dataFolder) // Get contents of main book folder recursively
+        registerBook({ // Registering Book into database
           title: params.title,
           authors: [],
           pages: bookContents.length,
           year: params.year,
-          location: loc,
+          location: currentFolder.substring(params.dataFolder.length, currentFolder.length),
           contents: bookContents,
           cover: bookContents[0]
-        }
-
-        Author.findOne({
-          name: params.author
-        }).exec(function(err, author){
-          if (err) return res.serverError(err)
-          if (!author) { // author does not exist, creating
-            console.log("author does not exist yet, creating..")
-            Author.create({
-              name: params.author,
-              bio: "",
-              wrote: []
-            }).exec(function(err, newAuthor) {
-              if (err) return res.serverError(err)
-              console.log("Created new author : <" + JSON.stringify(newAuthor) + ">")
-              bookParams.authors.push(newAuthor.id)
-              console.log("Creating book with params: " + JSON.stringify(bookParams))
-              Book.create(bookParams).exec(function(err, records) {
-                newAuthor.wrote.push(records.id)
-                newAuthor.save()
-                console.log("Created Book with id <" + records.id + "> and new Author with id <" + newAuthor.id + ">")
-                cb(records)
-              })
-            })
-          } else { // author already exists
-            bookParams.authors.push(author.id)
-            Book.create(bookParams).exec(function(err, records) {
-              if (err) return res.serverError(err)
-              author.wrote.push(records.id)
-              author.save()
-              console.log("Created Book with id <" + records.id + "> and Author with id <" + author.id + ">")
-              cb(records)
-            })
-          }
         })
-      } //endif handleCount == 0
-    } // end decrementHandleCount
+      }
+    }
 
-    incrementHandleCount()
-    zipfile.on("close", function() {
-      console.log("closed input file")
-      decrementHandleCount()
+    incrementHandleCount() // To start things up
+    zipfile.on("close", function() { // When an entry has been closed,
+      decrementHandleCount() // reduce the number of remaining entries to pop
     })
 
-    zipfile.readEntry()
-    zipfile.on("entry", function(entry) {
-      if (/\/$/.test(entry.fileName)) {
-        var foldername = params.dataFolder + entry.fileName
-        Archive.makeDirAsync(foldername, function() {
+    zipfile.readEntry() // We pop the first entry, but not until the 'entry' event listener is attached
+    zipfile.on("entry", function(entry) { // So this always fire directly
+      if (/\/$/.test(entry.fileName)) { // If file name ends with a '/', it means it's a directory
+        var foldername = params.dataFolder + entry.fileName // CDN url + directory path
+        Archive.makeDirAsync(foldername, function() { // The folder has been created
           if (err) throw err;
-          zipfile.readEntry()
+          zipfile.readEntry() // so we pop the next entry
         })
-      } else {
-        zipfile.openReadStream(entry, function(err, readStream) {
+      } else { // If the file name doesn't end with a '/', it's a file
+        zipfile.openReadStream(entry, function(err, readStream) { // Read on that file with a stream
           if (err) throw err
-          // report progress through large files
           var filename = params.dataFolder + entry.fileName
           var filter = new Transform()
           filter._transform = function(chunk, encoding, cb) {
             cb(null, chunk)
           }
-          filter._flush = function(cb) {
-            cb()
+          filter._flush = function(cb) { // We use the filter's flush event to drecremend the handle count
+            cb() // see writeStream.on("close") below
             zipfile.readEntry()
           }
-          // pump file contents
-          var writeStream = fs.createWriteStream(filename)
-          incrementHandleCount()
-          writeStream.on("close", decrementHandleCount)
-          readStream.pipe(filter).pipe(writeStream)
+          var writeStream = fs.createWriteStream(filename) // Prepare to write on destination file
+          incrementHandleCount() // Keep trace of the open stream
+          writeStream.on("close", decrementHandleCount) // When stream is closed, release handle
+          readStream.pipe(filter).pipe(writeStream) // Pipe the read stream to the write stream
         })
       }
     })
+
+    function registerBook(bookParams) { // Called when unarchiving is over
+      Author.findOne({ // We try to find an Author
+        name: params.author // with the provided name
+      }).exec(function(err, author){
+        if (err) return res.serverError(err)
+        if (!author) { // If we don't find one,
+          Author.create({ // create it
+            name: params.author, // with the supplied name...
+            bio: "", // an empty biography...
+            wrote: [] // and an empty array of Book.id, which we will update afterwards
+          }).exec(function(err, newAuthor) {
+            if (err) return res.serverError(err)
+            bookParams.authors.push(newAuthor.id) // Update parameters with the new Author's id
+            Book.create(bookParams).exec(function(err, records) { // Once the Book is created...
+              if (err) return res.serverError(err)
+              newAuthor.wrote.push(records.id) // ... we add it's id to the Author's array of Book.id
+              newAuthor.save()
+              cb(records) // Finally, we return the newly created Book as json
+            })
+          })
+        } else { // We found an Author!
+          bookParams.authors.push(author.id) // Same as above, but with the existing Author info
+          Book.create(bookParams).exec(function(err, records) {
+            if (err) return res.serverError(err)
+            author.wrote.push(records.id)
+            author.save()
+            cb(records)
+          })
+        }
+      })
+    }
   }
 }
