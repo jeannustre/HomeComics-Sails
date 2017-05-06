@@ -34,8 +34,7 @@ module.exports.routes = {
 
   '/': {
     view: 'homepage'
-  },
-  'get /books': 'BooksController.all'
+  }
 
   /***************************************************************************
   *                                                                          *

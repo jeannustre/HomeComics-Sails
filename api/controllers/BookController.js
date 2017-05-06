@@ -33,6 +33,20 @@ var BookC = {
     )
   },
 
+  all: function(req, res) {
+    Book.find().exec(function(err, books) {
+      if (err) {
+        return res.serverError(err)
+      }
+      var i = 0
+      while (i < books.length) {
+        delete books[i].contents
+        i++
+      }
+      return res.json(books);
+    })
+	},
+
   upload: function(req, res) {
     req.file('archive').upload({
       // 800MB
@@ -147,12 +161,13 @@ function rarCallback(req) {
     }
     // now check contents
     var bookContents = getContents(currentFolder)
-    var loc = currentFolder.substring(dataFolder.length, currentFolder.length
-    //var authorsID = []
-    authors.push(req.param("author", "No Author"))
+    var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
+      var authorsID = []
+      authorsID.push(req.param("author", "No Author"))
+      authorsID.push("FillerAuthor", "")
     Book.create({
       title: req.param("title", "No Title"),
-      authors: [req.param("author", "No Author")],
+      authors: authorsID,
       pages: bookContents.length,
       year: req.param("year", 0),
       location: loc,
@@ -180,9 +195,12 @@ function zipCallback(req) {
         console.log("all input and output handles closed")
         var bookContents = getContents(currentFolder)
         var loc = currentFolder.substring(dataFolder.length, currentFolder.length)
+        var authorsID = []
+        authorsID.push(req.param("author", "No Author"))
+        authorsID.push("FillerAuthor", "")
         Book.create({
           title: req.param("title", "No Title"),
-          authors: [req.param("author", "No Author")],
+          authors: authorsID,
           pages: bookContents.length,
           year: req.param("year", 0),
           location: loc,
