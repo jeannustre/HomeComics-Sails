@@ -86,7 +86,7 @@ function rarCallback(options, cb) {
           wrote: [] // and an empty array of Book.id, which we will update afterwards
         }).exec(function(err, newAuthor) {
           if (err) return res.serverError(err)
-          bookParams.author.push(newAuthor.id) // Update parameters with the new Author's id
+          bookParams.authors.push(newAuthor.id) // Update parameters with the new Author's id
           Book.create(bookParams).exec(function(err, records) { // Once the Book is created...
             if (err) return res.serverError(err)
             newAuthor.wrote.push(records.id) // ... we add it's id to the Author's array of Book.id
@@ -95,7 +95,7 @@ function rarCallback(options, cb) {
           })
         })
       } else { // We found an Author!
-        bookParams.author.push(author.id) // Same as above, but with the extisting Author info
+        bookParams.authors.push(author.id) // Same as above, but with the extisting Author info
         Book.create(bookParams).exec(function(err, records) {
           if (err) return res.serverError(err)
           author.wrote.push(records.id) //
