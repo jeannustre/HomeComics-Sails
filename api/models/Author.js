@@ -21,5 +21,9 @@ module.exports = {
       type: 'array' // array of Book.id
     },
 
+    picture: {
+      type: 'string' // url of picture on the CDN
+    },
+
   }
 };
